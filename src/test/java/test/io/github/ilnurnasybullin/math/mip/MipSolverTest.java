@@ -35,12 +35,14 @@ public class MipSolverTest {
     @MethodSource("boundedKnapsack_1_Success_Data")
     public void test_BoundedKnapsack_1_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
+        for (SimplexAnswer answer: answers) {
+            Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
 
-        assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+            assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> boundedKnapsack_1_Success_Data() {
@@ -84,10 +86,12 @@ public class MipSolverTest {
     @MethodSource("_0_1_KnapsackProblem_1_Success_Data")
     public void test_0_1_KnapsackProblem_1_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        for (SimplexAnswer answer: answers) {
+            Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> _0_1_KnapsackProblem_1_Success_Data() {
@@ -132,12 +136,14 @@ public class MipSolverTest {
     @MethodSource("boundedKnapsack_2_Success_Data")
     public void test_BoundedKnapsack_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
+        for (SimplexAnswer answer: answers) {
+            Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
 
-        assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+            assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Matcher<Double[]> arrayCloseTo(Double[] array, double error) {
@@ -183,10 +189,12 @@ public class MipSolverTest {
     @MethodSource("integerProgramming_1_Success_Data")
     public void test_IntegerProgramming_1_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        for (SimplexAnswer answer: answers) {
+            Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> integerProgramming_1_Success_Data() {
@@ -223,12 +231,16 @@ public class MipSolverTest {
      */
     @ParameterizedTest
     @MethodSource("integerProgramming_2_Success_Data")
-    public void test_IntegerProgramming_2_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
+    public void test_IntegerProgramming_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        for (SimplexAnswer answer: answers) {
+            Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
+
+            assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> integerProgramming_2_Success_Data() {
@@ -249,10 +261,11 @@ public class MipSolverTest {
                 .setC(C)
                 .setInequalities(inequalities);
 
-        double[] X = {3, 2};
+        Double[] X1 = {3d, 2d};
+        Double[] X2 = {2d, 3d};
         double fx = -5;
 
-        return Stream.of(Arguments.of(builder, X, fx));
+        return Stream.of(Arguments.of(builder, Set.of(X1, X2), fx));
     }
 
     /**
@@ -265,10 +278,12 @@ public class MipSolverTest {
     @MethodSource("integerProgramming_3_Success_Data")
     public void test_IntegerProgramming_3_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        for (SimplexAnswer answer: answers) {
+            Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> integerProgramming_3_Success_Data() {
@@ -304,12 +319,14 @@ public class MipSolverTest {
     @MethodSource("_0_1_KnapsackProblem_2_Success_Data")
     public void test_0_1_KnapsackProblem_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        SimplexAnswer answer = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.solve(builder);
 
-        Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
+        for (SimplexAnswer answer: answers) {
+            Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
 
-        assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
-        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+            assertThat(expectedX, hasItem(arrayCloseTo(X, Simplex.EPSILON)));
+            Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
+        }
     }
 
     public static Stream<Arguments> _0_1_KnapsackProblem_2_Success_Data() {

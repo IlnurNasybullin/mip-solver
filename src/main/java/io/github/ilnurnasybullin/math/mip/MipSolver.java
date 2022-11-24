@@ -2,20 +2,20 @@ package io.github.ilnurnasybullin.math.mip;
 
 import io.github.ilnurnasybullin.math.simplex.FunctionType;
 import io.github.ilnurnasybullin.math.simplex.Inequality;
+import io.github.ilnurnasybullin.math.simplex.Simplex;
 import io.github.ilnurnasybullin.math.simplex.SimplexAnswer;
+import io.github.ilnurnasybullin.math.simplex.exception.IncompatibleSimplexSolveException;
+import io.github.ilnurnasybullin.math.simplex.exception.SimplexDataException;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.DoublePredicate;
 import java.util.function.DoubleUnaryOperator;
 import java.util.function.Function;
 
-import io.github.ilnurnasybullin.math.simplex.Simplex;
-import io.github.ilnurnasybullin.math.simplex.exception.*;
-
-import static io.github.ilnurnasybullin.math.simplex.FunctionType.MAX;
 import static io.github.ilnurnasybullin.math.simplex.Inequality.GE;
 import static io.github.ilnurnasybullin.math.simplex.Inequality.LQ;
 
@@ -25,22 +25,6 @@ import static io.github.ilnurnasybullin.math.simplex.Inequality.LQ;
  * Каждый узел решается в отдельном потоке (для увеличения скорости вычисления)
  */
 public class MipSolver {
-
-    /**
-     * Рекордное значение (наиболее оптимальное значение). До тех пор, пока не вычислено - его значение null.
-     */
-    private volatile Double recordValue;
-
-    /**
-     * Полученный ответ для рекордного значения
-     */
-    private volatile SimplexAnswer answerValue;
-
-    /**
-     * Тип целевой функции. Необходим для выбора более оптимального значений функций из 2 предложенных (f<sub>1</sub> &lt
-     * f<sub>2</sub>). При f &rarr min более оптимальное значение - f<sub>1</sub>, при f &rarr max - f<sub>2</sub>
-     */
-    private FunctionType functionType;
 
     /**
      * Предикаты (в количестве {@link #xCount}), которые определяют, является ли x<sub>i</sub> корректным значением,
@@ -72,7 +56,7 @@ public class MipSolver {
      * Обработчик ошибок при решении задачи симплекс-методом (все возможные типы ошибок при решении задачи
      * симплекс-методом лежат в пакете {@link io.github.ilnurnasybullin.math.simplex.exception}. По умолчанию - вывод
      * в консоль {@link System#err} сообщения ошибки ({@link Throwable#getMessage()}). Для установки собственного
-     * обработчика ошибок - воспользуйтесь методом {@link #setExceptionHandler(Consumer)}
+     * обработчика ошибок - воспользуйтесь методом {@link #exceptionHandler(Consumer)}
      */
     private Consumer<Throwable> exceptionHandler = exception -> System.err.println(exception.getMessage());
 
@@ -90,26 +74,26 @@ public class MipSolver {
      */
     private int oldConstraintsCount;
 
-    /**
-     * Объект для блокировки к доступу (записи) некоторых ресурсов ({@link #recordValue}, {@link #answerValue})
-     */
-    private final ReentrantLock lock = new ReentrantLock();
+    private AnswersAccumulator answersAccumulator;
+
+    private Executor executor = Runnable::run;
 
     /**
      * Основной метод для взаимодействия пользователя с классом. В качестве аргумента передаётся настроенный
      * {@link Simplex.Builder} для решения задачи линейного программирования симплекс-методом, предикаты
      * ({@link #correctValues}) и унарные операторы ({@link #lowerBoundFunctions}, {@link #upperBoundFunctions})
-     * вычисляются по умолчанию, в качестве ответа возвращается {@link SimplexAnswer}, содеражщий вычисленные значения
-     * вектора X ({@link SimplexAnswer#getX()}) и значение функции ({@link SimplexAnswer#getFx()}). В процессе вычисления
-     * возможны все выбросы исключений при решении задачи симплекс-методом ({@link io.github.ilnurnasybullin.math.simplex.exception}),
-     * которые, при решении во всех узлах (кроме корневого) будут перехвачены обработчиком ошибок {@link #exceptionHandler}
+     * вычисляются по умолчанию, в качестве ответа возвращается {@link List<SimplexAnswer>}, содеражщий всевозможные
+     * оптимальные значения вектора X ({@link SimplexAnswer#getX()}) и значение функции ({@link SimplexAnswer#getFx()}).
+     * В процессе вычисления возможны все выбросы исключений при решении задачи симплекс-методом
+     * ({@link io.github.ilnurnasybullin.math.simplex.exception}), которые, при решении во всех узлах (кроме корневого)
+     * будут перехвачены обработчиком ошибок {@link #exceptionHandler}
      */
-    public SimplexAnswer solve(Simplex.Builder simplexBuilder) {
+    public List<SimplexAnswer> solve(Simplex.Builder simplexBuilder) {
         initCounts(simplexBuilder);
         initializeValues(simplexBuilder, defaultLowerBoundFunctions(xCount), defaultUpperBoundFunctions(xCount),
                 defaultPredicates(xCount));
         solveSimplex(simplexBuilder);
-        return answerValue;
+        return answersAccumulator.answers();
     }
 
     public static DoublePredicate[] defaultPredicates(int xCount) {
@@ -150,20 +134,17 @@ public class MipSolver {
      * Расширенный метод для взаимодействия пользователя с классом. В качестве аргумента передаётся настроенный
      * {@link Simplex.Builder} для решения задачи линейного программирования симплекс-методом, предикаты
      * ({@link DoublePredicate}) и унарные операторы ({@link DoubleUnaryOperator}) для определения дополнительных
-     * ограничений, устанавливаемых задачей дискретной оптимизации; в качестве ответа возвращается {@link SimplexAnswer},
-     * содеражщий вычисленные значения вектора X ({@link SimplexAnswer#getX()}) и значение функции
-     * ({@link SimplexAnswer#getFx()}). В процессе вычисления возможны все выбросы исключений при решении задачи
-     * симплекс-методом ({@link io.github.ilnurnasybullin.math.simplex.exception}), которые, при решении во всех узлах
-     * (кроме корневого) будут перехвачены обработчиком ошибок {@link #exceptionHandler}
+     * ограничений, устанавливаемых задачей дискретной оптимизации.
+     * @see #solve(Simplex.Builder)
      */
-    public SimplexAnswer solve(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
+    public List<SimplexAnswer> solve(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
                                       DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
         initCounts(simplexBuilder);
 
         validateArrays(simplexBuilder.getC(), lowerBoundFunctions, upperBoundFunctions, predicates);
         initializeValues(simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates);
         solveSimplex(simplexBuilder);
-        return answerValue;
+        return answersAccumulator.answers();
     }
 
     private void solveSimplex(Simplex.Builder simplexBuilder) {
@@ -181,16 +162,15 @@ public class MipSolver {
      * ограничения), либо {@link Simplex#changeB(int, double)} (при замене уже добавленного ограничения на новое (замена
      * значения правой части ограничения)). В случае неудовлетворения вычисленного вектора X условиям задачи дискретной
      * оптимизации происходит перевычисление задачи (переход к новому узлу) {@link #resolve(Simplex, Integer[], int, double, int)};
-     * в случае удовлетворения - сравнение вычисленного значения с {@link #recordValue} и установка {@link #setAnswer(SimplexAnswer)}
-     * в том случае, если значение более оптимальное, чем {@link #recordValue}.
+     * в случае удовлетворения - сравнение вычисленного значения с существующим и установка
+     * {@link #setAnswer(SimplexAnswer)} в том случае, если значение более оптимальное.
      */
     private void solve(Simplex simplex, Function<Simplex, SimplexAnswer> solver, Integer[] biOrder,
                        int constraintCount) {
         SimplexAnswer answer = solver.apply(simplex);
         double[] X = answer.X();
-        double fx = answer.fx();
 
-        if (!isBetter(fx, recordValue)) {
+        if (!answersAccumulator.isBetter(answer)) {
             return;
         }
 
@@ -205,37 +185,9 @@ public class MipSolver {
 
     /**
      * Установка вычисленного решения ({@link SimplexAnswer}) в том случае, если вычисленное решение оптимальнее
-     * {@link #recordValue}
      */
     private void setAnswer(SimplexAnswer answer) {
-        double fx = answer.fx();
-
-        try {
-            lock.lock();
-            if (!isBetter(fx, recordValue)) {
-                return;
-            }
-
-            answerValue = answer;
-            recordValue = fx;
-        } finally {
-            lock.unlock();
-        }
-
-    }
-
-    /**
-     * Сравнение двух значений - нового найденного и рекордного - является ли новое
-     * значение более оптимальным, чем рекордного
-     * @param newValue - новое значение функции,
-     *        oldValue - рекордное значение функции
-     */
-    private boolean isBetter(double newValue, Double oldValue) {
-        if (oldValue == null) {
-            return true;
-        }
-
-        return functionType == MAX ? newValue > oldValue : newValue < oldValue;
+        answersAccumulator.tryAddAnswer(answer);
     }
 
     private Integer getInvalidXIndex(double[] x) {
@@ -276,7 +228,7 @@ public class MipSolver {
         }
 
         CompletableFuture<Void>  future = CompletableFuture
-                .runAsync(() -> solve(copy, lowerBoundFunction, lowerBiOrder, lowerBiOrder[xIndex]))
+                .runAsync(() -> solve(copy, lowerBoundFunction, lowerBiOrder, lowerBiOrder[xIndex]), executor)
                 .exceptionally(exception -> {
                     exceptionHandler.accept(exception);
                     return null;
@@ -326,13 +278,13 @@ public class MipSolver {
         this.upperBoundFunctions = upperBoundFunctions;
         this.correctValues = predicates;
 
-        functionType = simplexBuilder.getFunctionType();
+        FunctionType functionType = simplexBuilder.getFunctionType();
+
         if (functionType == null) {
             functionType = Simplex.defaultFunctionType();
         }
 
-        answerValue = null;
-        recordValue = null;
+        answersAccumulator = new AnswersAccumulator(functionType);
     }
 
     private void validateArrays(double[] C, DoubleUnaryOperator[] lowerBoundFunctions,
@@ -352,7 +304,13 @@ public class MipSolver {
         }
     }
 
-    public void setExceptionHandler(Consumer<Throwable> exceptionHandler) {
+    public MipSolver exceptionHandler(Consumer<Throwable> exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
+        return this;
+    }
+
+    public MipSolver executor(Executor executor) {
+        this.executor = executor;
+        return this;
     }
 }
