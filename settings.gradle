@@ -1,0 +1,8 @@
+rootProject.name = 'mip-solver'
+
+sourceControl {
+    gitRepository("https://github.com/IlnurNasybullin/simplex-solver.git") {
+        producesModule("io.github.ilnurnasybullin.math:simplex")
+    }
+}
+
