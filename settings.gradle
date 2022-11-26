@@ -1,4 +1,4 @@
-rootProject.name = 'mip-solver'
+include 'mip'
 
 sourceControl {
     gitRepository("https://github.com/IlnurNasybullin/simplex-solver.git") {
