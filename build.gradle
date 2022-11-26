@@ -1,5 +1,6 @@
 allprojects {
     apply plugin: 'java'
+    apply plugin: 'java-library'
 
     group 'io.github.ilnurnasybullin.math'
     version '1.0.0'
@@ -28,7 +29,7 @@ allprojects {
     }
 
     dependencies {
-        implementation('io.github.ilnurnasybullin.math:simplex') {
+        api('io.github.ilnurnasybullin.math:simplex') {
             version {
                 branch = 'main'
             }
