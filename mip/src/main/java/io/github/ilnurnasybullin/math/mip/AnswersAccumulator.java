@@ -69,8 +69,8 @@ class AnswersAccumulator {
                 recordValue = fx;
                 return true;
             }
-            if (functionType == FunctionType.MAX && fx > recordValue ||
-                functionType == FunctionType.MIN && fx < recordValue) {
+            if (functionType == FunctionType.MAX && fx >= recordValue ||
+                functionType == FunctionType.MIN && fx <= recordValue) {
                 answers.clear();
                 answers.add(answer);
                 recordValue = fx;
