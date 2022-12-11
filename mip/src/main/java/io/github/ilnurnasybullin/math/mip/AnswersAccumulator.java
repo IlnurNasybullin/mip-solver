@@ -31,7 +31,7 @@ class AnswersAccumulator {
         this.functionType = functionType;
     }
 
-    public boolean isBetter(SimplexAnswer answer) {
+    public boolean hasBetterThan(SimplexAnswer answer) {
         double fx = answer.fx();
         Double localRecordValue;
         lock.lock();
@@ -39,16 +39,16 @@ class AnswersAccumulator {
         lock.unlock();
 
         if (localRecordValue == null) {
-            return true;
+            return false;
         }
 
         if (isApproximateEqual(fx, localRecordValue)) {
-            return true;
+            return false;
         }
 
         return functionType == FunctionType.MAX ?
-                fx >= localRecordValue  :
-                fx <= localRecordValue;
+                fx < localRecordValue  :
+                fx > localRecordValue;
     }
 
     private boolean isApproximateEqual(double x1, double x2) {
@@ -69,8 +69,8 @@ class AnswersAccumulator {
                 recordValue = fx;
                 return true;
             }
-            if (functionType == FunctionType.MAX && fx >= recordValue ||
-                functionType == FunctionType.MIN && fx <= recordValue) {
+            if (functionType == FunctionType.MAX && fx > recordValue ||
+                functionType == FunctionType.MIN && fx < recordValue) {
                 answers.clear();
                 answers.add(answer);
                 recordValue = fx;

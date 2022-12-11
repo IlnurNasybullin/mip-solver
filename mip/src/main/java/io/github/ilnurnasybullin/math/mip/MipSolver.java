@@ -170,7 +170,7 @@ public class MipSolver {
         SimplexAnswer answer = solver.apply(simplex);
         double[] X = answer.X();
 
-        if (!answersAccumulator.isBetter(answer)) {
+        if (answersAccumulator.hasBetterThan(answer)) {
             return;
         }
 
