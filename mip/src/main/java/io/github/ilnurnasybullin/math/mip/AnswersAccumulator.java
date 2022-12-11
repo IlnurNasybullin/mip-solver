@@ -47,8 +47,8 @@ class AnswersAccumulator {
         }
 
         return functionType == FunctionType.MAX ?
-                fx > localRecordValue  :
-                fx < localRecordValue;
+                fx >= localRecordValue  :
+                fx <= localRecordValue;
     }
 
     private boolean isApproximateEqual(double x1, double x2) {
