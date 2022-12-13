@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.DoubleStream;
@@ -34,7 +35,7 @@ public class MipSolverTest {
     @MethodSource("boundedKnapsack_1_Success_Data")
     public void test_BoundedKnapsack_1_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
@@ -85,12 +86,19 @@ public class MipSolverTest {
     @MethodSource("_0_1_KnapsackProblem_1_Success_Data")
     public void test_0_1_KnapsackProblem_1_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
             Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
         }
+
+        var simplex1 = new MipSolver();
+        SimplexAnswer answer = simplex1.findAny(builder);
+        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON, () ->
+                String.format("Arrays %s and %s are not equal", Arrays.toString(expectedX), Arrays.toString(answer.X()))
+        );
+        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
     }
 
     public static Stream<Arguments> _0_1_KnapsackProblem_1_Success_Data() {
@@ -135,7 +143,7 @@ public class MipSolverTest {
     @MethodSource("boundedKnapsack_2_Success_Data")
     public void test_BoundedKnapsack_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
@@ -188,12 +196,17 @@ public class MipSolverTest {
     @MethodSource("integerProgramming_1_Success_Data")
     public void test_IntegerProgramming_1_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
             Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
         }
+
+        var simplex1 = new MipSolver();
+        SimplexAnswer answer = simplex1.findAny(builder);
+        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
+        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
     }
 
     public static Stream<Arguments> integerProgramming_1_Success_Data() {
@@ -232,7 +245,7 @@ public class MipSolverTest {
     @MethodSource("integerProgramming_2_Success_Data")
     public void test_IntegerProgramming_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);
@@ -277,12 +290,17 @@ public class MipSolverTest {
     @MethodSource("integerProgramming_3_Success_Data")
     public void test_IntegerProgramming_3_Success(Simplex.Builder builder, double[] expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
             Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
         }
+
+        var simplex1 = new MipSolver();
+        SimplexAnswer answer = simplex1.findAny(builder);
+        Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
+        Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
     }
 
     public static Stream<Arguments> integerProgramming_3_Success_Data() {
@@ -318,7 +336,7 @@ public class MipSolverTest {
     @MethodSource("_0_1_KnapsackProblem_2_Success_Data")
     public void test_0_1_KnapsackProblem_2_Success(Simplex.Builder builder, Set<Double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.solve(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder);
 
         for (SimplexAnswer answer: answers) {
             Double[] X = DoubleStream.of(answer.X()).boxed().toArray(Double[]::new);

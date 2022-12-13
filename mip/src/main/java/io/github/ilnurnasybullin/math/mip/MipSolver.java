@@ -88,12 +88,33 @@ public class MipSolver {
      * ({@link io.github.ilnurnasybullin.math.simplex.exception}), которые, при решении во всех узлах (кроме корневого)
      * будут перехвачены обработчиком ошибок {@link #exceptionHandler}
      */
-    public List<SimplexAnswer> solve(Simplex.Builder simplexBuilder) {
+    public List<SimplexAnswer> findAll(Simplex.Builder simplexBuilder) {
+        answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
+        solve(simplexBuilder);
+
+        @SuppressWarnings("unchecked")
+        var answer = (List<SimplexAnswer>) answersAccumulator.answer();
+        return answer;
+    }
+
+    public SimplexAnswer findAny(Simplex.Builder simplexBuilder) {
+        answersAccumulator = new SingleAnswerAccumulator(functionType(simplexBuilder.getFunctionType()));
+        solve(simplexBuilder);
+
+        return (SimplexAnswer) answersAccumulator.answer();
+    }
+
+    private void solve(Simplex.Builder simplexBuilder) {
         initCounts(simplexBuilder);
-        initializeValues(simplexBuilder, defaultLowerBoundFunctions(xCount), defaultUpperBoundFunctions(xCount),
+        initializeValues(defaultLowerBoundFunctions(xCount), defaultUpperBoundFunctions(xCount),
                 defaultPredicates(xCount));
         solveSimplex(simplexBuilder);
-        return answersAccumulator.answers();
+    }
+
+    private FunctionType functionType(FunctionType functionType) {
+        return functionType == null ?
+                Simplex.defaultFunctionType() :
+                functionType;
     }
 
     public static DoublePredicate[] defaultPredicates(int xCount) {
@@ -135,20 +156,36 @@ public class MipSolver {
      * {@link Simplex.Builder} для решения задачи линейного программирования симплекс-методом, предикаты
      * ({@link DoublePredicate}) и унарные операторы ({@link DoubleUnaryOperator}) для определения дополнительных
      * ограничений, устанавливаемых задачей дискретной оптимизации.
-     * @see #solve(Simplex.Builder)
+     * @see #findAll(Simplex.Builder)
      */
-    public List<SimplexAnswer> solve(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
-                                      DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
+    public List<SimplexAnswer> findAll(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
+                                       DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
+        answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
+        solve(simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates);
+
+        @SuppressWarnings("unchecked")
+        var answer = (List<SimplexAnswer>) answersAccumulator.answer();
+        return answer;
+    }
+
+    public SimplexAnswer findAny(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
+                                 DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
+        answersAccumulator = new SingleAnswerAccumulator(functionType(simplexBuilder.getFunctionType()));
+        solve(simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates);
+        return (SimplexAnswer) answersAccumulator.answer();
+    }
+
+    private void solve(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
+                       DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
         initCounts(simplexBuilder);
 
         validateArrays(simplexBuilder.getC(), lowerBoundFunctions, upperBoundFunctions, predicates);
-        initializeValues(simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates);
+        initializeValues(lowerBoundFunctions, upperBoundFunctions, predicates);
         solveSimplex(simplexBuilder);
-        return answersAccumulator.answers();
     }
 
     private void solveSimplex(Simplex.Builder simplexBuilder) {
-        solve(simplexBuilder.build(), Simplex::solve, new Integer[xCount * 2], -1);
+        solveSimplex(simplexBuilder.build(), Simplex::solve, new Integer[xCount * 2], -1);
     }
 
     private void initCounts(Simplex.Builder simplexBuilder) {
@@ -165,8 +202,8 @@ public class MipSolver {
      * в случае удовлетворения - сравнение вычисленного значения с существующим и установка
      * {@link #setAnswer(SimplexAnswer)} в том случае, если значение более оптимальное.
      */
-    private void solve(Simplex simplex, Function<Simplex, SimplexAnswer> solver, Integer[] biOrder,
-                       int constraintCount) {
+    private void solveSimplex(Simplex simplex, Function<Simplex, SimplexAnswer> solver, Integer[] biOrder,
+                         int constraintCount) {
         SimplexAnswer answer = solver.apply(simplex);
         double[] X = answer.X();
 
@@ -187,7 +224,7 @@ public class MipSolver {
      * Установка вычисленного решения ({@link SimplexAnswer}) в том случае, если вычисленное решение оптимальнее
      */
     private void setAnswer(SimplexAnswer answer) {
-        answersAccumulator.tryAddAnswer(answer);
+        answersAccumulator.tryPutAnswer(answer);
     }
 
     private Integer getInvalidXIndex(double[] x) {
@@ -228,14 +265,14 @@ public class MipSolver {
         }
 
         CompletableFuture<Void>  future = CompletableFuture
-                .runAsync(() -> solve(copy, lowerBoundFunction, lowerBiOrder, lowerBiOrder[xIndex]), executor)
+                .runAsync(() -> solveSimplex(copy, lowerBoundFunction, lowerBiOrder, lowerBiOrder[xIndex]), executor)
                 .exceptionally(exception -> {
                     exceptionHandler.accept(exception);
                     return null;
                 });
 
         try {
-            solve(simplex, upperBoundFunction, upperBiOrder, upperBiOrder[xIndex + xCount]);
+            solveSimplex(simplex, upperBoundFunction, upperBiOrder, upperBiOrder[xIndex + xCount]);
         } catch (IncompatibleSimplexSolveException e) {
             exceptionHandler.accept(e);
         }
@@ -272,19 +309,11 @@ public class MipSolver {
         return ai;
     }
 
-    private void initializeValues(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
+    private void initializeValues(DoubleUnaryOperator[] lowerBoundFunctions,
                                   DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
         this.lowerBoundFunctions = lowerBoundFunctions;
         this.upperBoundFunctions = upperBoundFunctions;
         this.correctValues = predicates;
-
-        FunctionType functionType = simplexBuilder.getFunctionType();
-
-        if (functionType == null) {
-            functionType = Simplex.defaultFunctionType();
-        }
-
-        answersAccumulator = new AnswersAccumulator(functionType);
     }
 
     private void validateArrays(double[] C, DoubleUnaryOperator[] lowerBoundFunctions,
