@@ -69,11 +69,11 @@ public class MipSolverAlternativeSolutionsTest {
 
     public static Stream<Arguments> _1_Data() {
         double[][] A = {
-                {1, 1, 1, 0, 0, 0},
-                {1, 0, 0, 1, 1, 0},
-                {0, 1, 0, 1, 0, 1},
-                {0, 0, 1, 0, 1, 1},
-                {1, 1, 1, 1, 1, 1}
+                {0.0, 1.0, 0.0, 0.0, 1.0, 1.0},
+                {0.0, 0.0, 1.0, 1.0, 0.0, 1.0},
+                {1.0, 0.0, 0.0, 1.0, 1.0, 0.0},
+                {1.0, 1.0, 1.0, 0.0, 0.0, 0.0},
+                {1.0, 1.0, 1.0, 1.0, 1.0, 1.0}
         };
         double[] B = {1, 1, 1, 1, 1};
         var inequalities = new Inequality[]{Inequality.LQ, Inequality.LQ, Inequality.LQ, Inequality.LQ, Inequality.LQ};

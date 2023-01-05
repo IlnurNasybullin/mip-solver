@@ -457,7 +457,7 @@ public class MipSolver {
                 return;
             }
 
-            List<Simplex> alternativeSolutions = simplex.findAlternativeSolutions(executor);
+            List<Simplex> alternativeSolutions = simplex.findAlternativeSolutions();
 
             var tasks = alternativeSolutions.stream()
                     .map(alternativeSolution -> (Runnable) () -> compareAndResolve(alternativeSolution, new Integer[xCount * 2], -1))
