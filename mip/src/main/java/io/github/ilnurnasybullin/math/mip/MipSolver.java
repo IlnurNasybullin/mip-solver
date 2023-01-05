@@ -285,7 +285,7 @@ public class MipSolver {
                                 .stream()
                                 .map(wrapper::alternativeSolution)
                                 .forEach(simplexes::add);
-                        logger.log(System.Logger.Level.INFO, "ALTERNATIVE SOLUTIONS ARE FOUNDED, size is {}", simplexes.size() - size);
+                        logger.log(System.Logger.Level.INFO, "ALTERNATIVE SOLUTIONS ARE FOUNDED, size is {0}", simplexes.size() - size);
                     }
                 } catch (Exception e) {
                     exceptionHandler.accept(e);
