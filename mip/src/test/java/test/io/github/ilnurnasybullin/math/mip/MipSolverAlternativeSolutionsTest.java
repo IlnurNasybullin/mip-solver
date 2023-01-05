@@ -20,7 +20,7 @@ public class MipSolverAlternativeSolutionsTest {
     @MethodSource("_1_Data")
     public void test(Simplex.Builder builder, Set<double[]> expectedX, double expectedFx) {
         MipSolver simplex = new MipSolver();
-        List<SimplexAnswer> answers = simplex.withAlternativeSolutions(builder);
+        List<SimplexAnswer> answers = simplex.findAll(builder.build());
         answers.stream()
                 .map(SimplexAnswer::X)
                 .map(ArrayWrapper::new)

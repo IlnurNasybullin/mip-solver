@@ -1,23 +1,16 @@
 package io.github.ilnurnasybullin.math.mip;
 
-import io.github.ilnurnasybullin.math.simplex.FunctionType;
 import io.github.ilnurnasybullin.math.simplex.Inequality;
 import io.github.ilnurnasybullin.math.simplex.Simplex;
 import io.github.ilnurnasybullin.math.simplex.SimplexAnswer;
-import io.github.ilnurnasybullin.math.simplex.exception.IncompatibleSimplexSolveException;
 import io.github.ilnurnasybullin.math.simplex.exception.SimplexDataException;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.DoublePredicate;
 import java.util.function.DoubleUnaryOperator;
-import java.util.function.Function;
 
-import static io.github.ilnurnasybullin.math.simplex.Inequality.GE;
-import static io.github.ilnurnasybullin.math.simplex.Inequality.LQ;
+import static io.github.ilnurnasybullin.math.simplex.Inequality.*;
 
 /**
  * Класс, с помощью которого можно решать задачи дискретной оптимизации. Работает поверх класса {@link Simplex} с
@@ -26,8 +19,6 @@ import static io.github.ilnurnasybullin.math.simplex.Inequality.LQ;
  */
 public class MipSolver {
 
-    private Executor executor = Runnable::run;
-
     /**
      * Обработчик ошибок при решении задачи симплекс-методом (все возможные типы ошибок при решении задачи
      * симплекс-методом лежат в пакете {@link io.github.ilnurnasybullin.math.simplex.exception}. По умолчанию - вывод
@@ -35,6 +26,13 @@ public class MipSolver {
      * обработчика ошибок - воспользуйтесь методом {@link #exceptionHandler(Consumer)}
      */
     private Consumer<Throwable> exceptionHandler = exception -> System.err.println(exception.getMessage());
+
+    private System.Logger logger = new NoOpsLogger();
+
+    public MipSolver logger(System.Logger logger) {
+        this.logger = logger;
+        return this;
+    }
 
     /**
      * Основной метод для взаимодействия пользователя с классом. В качестве аргумента передаётся настроенный
@@ -47,134 +45,28 @@ public class MipSolver {
      * будут перехвачены обработчиком ошибок {@link #exceptionHandler}
      */
 
-    private System.Logger logger = new NoOpsLogger();
+    public List<SimplexAnswer> findAll(Simplex simplex) {
+        int xCount = simplex.xCount();
 
-    public MipSolver logger(System.Logger logger) {
-        this.logger = logger;
-        return this;
-    }
-
-    public List<SimplexAnswer> findAll(Simplex.Builder simplexBuilder) {
-        var answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new SimpleSolver(), simplexBuilder)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        return answersAccumulator.answer();
-    }
-
-    public SimplexAnswer findAny(Simplex.Builder simplexBuilder) {
-        var answersAccumulator = new SingleAnswerAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new SimpleSolver(), simplexBuilder)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        return answersAccumulator.answer();
-    }
-
-    /**
-     * Расширенный метод для взаимодействия пользователя с классом. В качестве аргумента передаётся настроенный
-     * {@link Simplex.Builder} для решения задачи линейного программирования симплекс-методом, предикаты
-     * ({@link DoublePredicate}) и унарные операторы ({@link DoubleUnaryOperator}) для определения дополнительных
-     * ограничений, устанавливаемых задачей дискретной оптимизации.
-     * @see #findAll(Simplex.Builder)
-     */
-    public List<SimplexAnswer> findAll(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
-                                       DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
-        var answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new SimpleSolver(), simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        return answersAccumulator.answer();
-    }
-
-    public SimplexAnswer findAny(Simplex.Builder simplexBuilder, DoubleUnaryOperator[] lowerBoundFunctions,
-                                 DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
-        var answersAccumulator = new SingleAnswerAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new SimpleSolver(), simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        return answersAccumulator.answer();
-    }
-
-    /**
-     * <b>Can be repeatable answers!</b>
-     */
-    public List<SimplexAnswer> withAlternativeSolutions(Simplex.Builder simplexBuilder) {
-        var answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new ExtendedSolver(), simplexBuilder)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        logger.log(System.Logger.Level.INFO, "Mip is solved");
-
-        return answersAccumulator.answer();
-    }
-
-    public List<SimplexAnswer> withAlternativeSolutions(Simplex.Builder simplexBuilder,
-                                                        DoubleUnaryOperator[] lowerBoundFunctions,
-                                                        DoubleUnaryOperator[] upperBoundFunctions,
-                                                        DoublePredicate[] predicates) {
-        var answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
-
-        configSolver(new ExtendedSolver(), simplexBuilder, lowerBoundFunctions, upperBoundFunctions, predicates)
-                .answersAccumulator(answersAccumulator)
-                .solveSimplex(simplexBuilder);
-
-        return answersAccumulator.answer();
-    }
-
-    private int xCount(Simplex.Builder builder) {
-        if (builder.getC() == null) {
-            throw new SimplexDataException("C vector is null!");
-        }
-
-        return builder.getC().length;
-    }
-
-    private Solver configSolver(Solver solver, Simplex.Builder builder) {
-        int xCount = xCount(builder);
-
-        DoubleUnaryOperator[] lowerBoundFunction = defaultLowerBoundFunctions(xCount);
-        DoubleUnaryOperator[] upperBoundFunction = defaultUpperBoundFunctions(xCount);
-        DoublePredicate[] predicates = defaultPredicates(xCount);
-
-        return configSolver(solver, builder, lowerBoundFunction, upperBoundFunction, predicates);
-    }
-
-    private Solver configSolver(Solver solver, Simplex.Builder builder, DoubleUnaryOperator[] lowerBoundFunctions,
-                                DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
-        solver = solver.logger(logger);
-        if (builder.getC() == null) {
-            throw new SimplexDataException("C vector is null!");
-        }
-
-        int xCount = builder.getC().length;
-
-        validateArrayLength(xCount, lowerBoundFunctions);
-        validateArrayLength(xCount, upperBoundFunctions);
-        validateArrayLength(xCount, predicates);
-
-        return solver.xCount(xCount)
-                .oldConstraintsCount(builder.getB().length)
-                .lowerBoundFunctions(lowerBoundFunctions)
-                .upperBoundFunctions(upperBoundFunctions)
-                .correctValues(predicates)
+        return new FindAllSolver()
                 .exceptionHandler(exceptionHandler)
-                .executor(executor);
+                .upperBoundFunctions(defaultUpperBoundFunctions(xCount))
+                .lowerBoundFunctions(defaultLowerBoundFunctions(xCount))
+                .correctValues(defaultPredicates(xCount))
+                .logger(logger)
+                .solveSimplex(simplex);
     }
 
-    private FunctionType functionType(FunctionType functionType) {
-        return functionType == null ?
-                Simplex.defaultFunctionType() :
-                functionType;
+    public SimplexAnswer findAny(Simplex simplex) {
+        int xCount = simplex.xCount();
+
+        return new FindAnySolver()
+                .exceptionHandler(exceptionHandler)
+                .upperBoundFunctions(defaultUpperBoundFunctions(xCount))
+                .lowerBoundFunctions(defaultLowerBoundFunctions(xCount))
+                .correctValues(defaultPredicates(xCount))
+                .logger(logger)
+                .solveSimplex(simplex);
     }
 
     public static DoublePredicate[] defaultPredicates(int xCount) {
@@ -222,38 +114,29 @@ public class MipSolver {
         return this;
     }
 
-    public MipSolver executor(Executor executor) {
-        this.executor = executor;
-        return this;
+    interface Solver<T> {
+        Solver<T> logger(System.Logger logger);
+        Solver<T> correctValues(DoublePredicate[] correctValues);
+        Solver<T> lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions);
+        Solver<T> upperBoundFunctions(DoubleUnaryOperator[] upperBoundFunctions);
+        Solver<T> exceptionHandler(Consumer<Throwable> exceptionHandler);
+
+        T solveSimplex(Simplex simplex);
     }
 
-    interface Solver {
-        Solver logger(System.Logger logger);
-        Solver answersAccumulator(AnswersAccumulator answersAccumulator);
-        Solver correctValues(DoublePredicate[] correctValues);
-        Solver lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions);
-        Solver upperBoundFunctions(DoubleUnaryOperator[] upperBoundFunctions);
-        Solver xCount(int xCount);
-        Solver executor(Executor executor);
-        Solver exceptionHandler(Consumer<Throwable> exceptionHandler);
-        Solver oldConstraintsCount(int oldConstraintsCount);
-
-        void solveSimplex(Simplex.Builder simplexBuilder);
-    }
-
-    private static class SimpleSolver implements Solver {
+    private static abstract class SimpleSolver<T> implements Solver<T> {
 
         /**
-         * Предикаты (в количестве {@link #xCount}), которые определяют, является ли x<sub>i</sub> корректным значением,
-         * удовлетворяющим условию задачи дискретной оптимизации (i = 1 .. {@link #xCount}). По умолчанию, используются
+         * Предикаты (в количестве {@link Simplex#xCount()}), которые определяют, является ли x<sub>i</sub> корректным значением,
+         * удовлетворяющим условию задачи дискретной оптимизации (i = 1 .. {@link Simplex#xCount()}). По умолчанию, используются
          * предикаты {@link #defaultPredicates(int)}, которые сравнивают число double (вещественное число) с приведённым long
          * (целым числом) c точностью до {@link Simplex#EPSILON}
          */
         protected DoublePredicate[] correctValues;
 
         /**
-         * Функции (унарные операторы) в количестве {@link #xCount}, которые преобразуют x<sub>i</sub> в некоторое значение
-         * d<sub>i</sub> : d<sub>i</sub> &le x<sub>i</sub>, d<sub>i</sub> &isin D, i = 1 .. {@link #xCount}, D - дискретное
+         * Функции (унарные операторы) в количестве {@link Simplex#xCount()}, которые преобразуют x<sub>i</sub> в некоторое значение
+         * d<sub>i</sub> : d<sub>i</sub> &le x<sub>i</sub>, d<sub>i</sub> &isin D, i = 1 .. {@link Simplex#xCount()}, D - дискретное
          * множество, удовлетворяющее условию задачи дискретной оптимизации. По умолчанию, используются унарные операторы
          * {@link #defaultLowerBoundFunctions(int)}, которые возвращают ближайшее "целое" число (представленное типом double,
          * {@link Math#floor(double)}), меньшее числа x<sub>i</sub>
@@ -261,117 +144,96 @@ public class MipSolver {
         protected DoubleUnaryOperator[] lowerBoundFunctions;
 
         /**
-         * Функции (унарные операторы) в количестве {@link #xCount}, которые преобразуют x<sub>i</sub> в некоторое значение
-         * e<sub>i</sub> : e<sub>i</sub> &ge x<sub>i</sub>, e<sub>i</sub> &isin D, i = 1 .. {@link #xCount}, D - дискретное
+         * Функции (унарные операторы) в количестве {@link Simplex#xCount()}, которые преобразуют x<sub>i</sub> в некоторое значение
+         * e<sub>i</sub> : e<sub>i</sub> &ge x<sub>i</sub>, e<sub>i</sub> &isin D, i = 1 .. {@link Simplex#xCount()}, D - дискретное
          * множество, удовлетворяющее условию задачи дискретной оптимизации. По умолчанию, используются унарные операторы
          * {@link #defaultUpperBoundFunctions(int)}, которые возвращают ближайшее "целое" число (представленное типом double,
          * {@link Math#ceil(double)}), большее числа x<sub>i</sub>
          */
         protected DoubleUnaryOperator[] upperBoundFunctions;
 
-        /**
-         * Количество переменных x. Вычисляется на основании вектора C (коэффициентов целевой функции c<sub>i</sub> перед
-         * соответствующими x<sub>i</sub>).
-         * @see Simplex.Builder#getC()
-         */
-        protected int xCount;
-
-        protected Executor executor = Runnable::run;
-
         protected Consumer<Throwable> exceptionHandler = exception -> System.err.println(exception.getMessage());
 
-        /**
-         * Количество основных ограничений в первоисходной симплексной задаче. Вычисляется на основании вектора B - правых
-         * частей ограничений, b<sub>i</sub>
-         * @see Simplex.Builder#getB()
-         */
-        protected int oldConstraintsCount;
-
-        protected AnswersAccumulator answersAccumulator;
+        protected System.Logger logger = new NoOpsLogger();
 
         @Override
-        public Solver logger(System.Logger logger) {
+        public SimpleSolver<T> logger(System.Logger logger) {
             return this;
         }
 
         @Override
-        public SimpleSolver answersAccumulator(AnswersAccumulator answersAccumulator) {
-            this.answersAccumulator = answersAccumulator;
-            return this;
-        }
-
-        @Override
-        public SimpleSolver correctValues(DoublePredicate[] correctValues) {
+        public SimpleSolver<T> correctValues(DoublePredicate[] correctValues) {
             this.correctValues = correctValues;
             return this;
         }
 
         @Override
-        public SimpleSolver lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions) {
+        public SimpleSolver<T> lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions) {
             this.lowerBoundFunctions = lowerBoundFunctions;
             return this;
         }
 
         @Override
-        public SimpleSolver upperBoundFunctions(DoubleUnaryOperator[] upperBoundFunctions) {
+        public SimpleSolver<T> upperBoundFunctions(DoubleUnaryOperator[] upperBoundFunctions) {
             this.upperBoundFunctions = upperBoundFunctions;
             return this;
         }
 
         @Override
-        public SimpleSolver xCount(int xCount) {
-            this.xCount = xCount;
-            return this;
-        }
-
-        @Override
-        public SimpleSolver executor(Executor executor) {
-            this.executor = executor;
-            return this;
-        }
-
-        @Override
-        public SimpleSolver exceptionHandler(Consumer<Throwable> exceptionHandler) {
+        public SimpleSolver<T> exceptionHandler(Consumer<Throwable> exceptionHandler) {
             this.exceptionHandler = exceptionHandler;
             return this;
         }
 
-        @Override
-        public SimpleSolver oldConstraintsCount(int oldConstraintsCount) {
-            this.oldConstraintsCount = oldConstraintsCount;
-            return this;
-        }
+        protected abstract AnswersAccumulator<T> answersAccumulator(Simplex simplex);
 
         @Override
-        public void solveSimplex(Simplex.Builder simplexBuilder) {
-            solveSimplex(simplexBuilder.build(), Simplex::solve, new Integer[xCount * 2], -1);
+        public T solveSimplex(Simplex simplex) {
+            AnswersAccumulator<T> answersAccumulator = answersAccumulator(simplex);
+            Queue<SimplexWrapper> simplexes = new ArrayDeque<>();
+            simplexes.add(new SimpleWrapper(simplex));
+
+            while (!simplexes.isEmpty()) {
+                SimplexWrapper wrapper = simplexes.remove();
+
+                SimplexAnswer answer = null;
+                try {
+                    Simplex smp = wrapper.solve();
+                    answer = smp.solve();
+                } catch (Exception e) {
+                    exceptionHandler.accept(e);
+                    continue;
+                }
+
+                if (isLegalAnswer(answer)) {
+                    answersAccumulator.tryPutAnswer(answer);
+                    continue;
+                }
+
+                if (!answersAccumulator.hasBetterThan(answer)) {
+                    List<SimplexWrapper> newSimplexes = createWithNewConstraints(wrapper);
+                    simplexes.addAll(newSimplexes);
+                }
+            }
+
+            return answersAccumulator.answer();
         }
 
-        /**
-         * Решении задачи линейного программирования симплекс-методом. Для корневого узла вызывается {@link Simplex#solve()},
-         * для всех остальных узлов - либо {@link Simplex#addConstraint(double[], Inequality, double)} (при добавлении нового
-         * ограничения), либо {@link Simplex#changeB(int, double)} (при замене уже добавленного ограничения на новое (замена
-         * значения правой части ограничения)). В случае неудовлетворения вычисленного вектора X условиям задачи дискретной
-         * оптимизации происходит перевычисление задачи (переход к новому узлу) {@link #resolve(Simplex, Integer[], int, double, int)};
-         * в случае удовлетворения - сравнение вычисленного значения с существующим и установка
-         * {@link #setAnswer(SimplexAnswer)} в том случае, если значение более оптимальное.
-         */
-        protected void solveSimplex(Simplex simplex, Function<Simplex, SimplexAnswer> solver, Integer[] biOrder,
-                                 int constraintCount) {
-            SimplexAnswer answer = solver.apply(simplex);
-            double[] X = answer.X();
+        protected List<SimplexWrapper> createWithNewConstraints(SimplexWrapper wrapper) {
+            double[] X =  wrapper.simplex().solve().X();
+            int xIndex = getInvalidXIndex(X);
 
-            if (answersAccumulator.hasBetterThan(answer)) {
-                return;
-            }
+            double lowerBound = lowerBoundFunctions[xIndex].applyAsDouble(X[xIndex]);
+            SimplexWrapper lower = wrapper.lowerBoundX(xIndex, lowerBound);
 
-            Integer xIndex = getInvalidXIndex(X);
-            if (xIndex == null) {
-                setAnswer(answer);
-                return;
-            }
+            double upperBound = upperBoundFunctions[xIndex].applyAsDouble(X[xIndex]);
+            SimplexWrapper upper = wrapper.upperBoundX(xIndex, upperBound);
 
-            resolve(simplex, biOrder, constraintCount, X[xIndex], xIndex);
+            return List.of(lower, upper);
+        }
+
+        protected boolean isLegalAnswer(SimplexAnswer answer) {
+            return getInvalidXIndex(answer.X()) == null;
         }
 
         protected Integer getInvalidXIndex(double[] x) {
@@ -384,137 +246,297 @@ public class MipSolver {
             return null;
         }
 
-        /**
-         * Установка вычисленного решения ({@link SimplexAnswer}) в том случае, если вычисленное решение оптимальнее
-         */
-        protected void setAnswer(SimplexAnswer answer) {
-            answersAccumulator.tryPutAnswer(answer);
-        }
+    }
 
-        /**
-         * Перевычисление задачи симплекс-методом, с добавлением нового ограничения или изменением правой части ограничения.
-         * Перевычисление двух узлов происходит параллельно: первый узел исполнятся асинхронно, второй узел исполняется на
-         * том же самом потоке, на котором был вызван этот метод. Все необходимые данные для асинхронного потока копируются.
-         */
-        protected void resolve(Simplex simplex, Integer[] biOrder, int constraintCount, double x, int xIndex) {
-            double lowerBound = lowerBoundFunctions[xIndex].applyAsDouble(x);
-            double upperBound = upperBoundFunctions[xIndex].applyAsDouble(x);
+    private static class FindAnySolver extends SimpleSolver<SimplexAnswer> {
 
-            Simplex copy = simplex.copy();
-
-            Integer[] lowerBiOrder = Arrays.copyOf(biOrder, biOrder.length);
-            Integer[] upperBiOrder = biOrder;
-
-            boolean[] isAdded = {false};
-            Function<Simplex, SimplexAnswer> lowerBoundFunction = getBoundFunction(biOrder, xIndex, lowerBound, LQ, isAdded);
-            if (isAdded[0]) {
-                lowerBiOrder[xIndex] = constraintCount + 1;
-            }
-
-            Function<Simplex, SimplexAnswer> upperBoundFunction = getBoundFunction(biOrder, xIndex + xCount,
-                    upperBound, GE, isAdded);
-            if (isAdded[0]) {
-                upperBiOrder[xIndex + xCount] = constraintCount + 1;
-            }
-
-            CompletableFuture<Void> future = CompletableFuture
-                    .runAsync(() -> solveSimplex(copy, lowerBoundFunction, lowerBiOrder, lowerBiOrder[xIndex]), executor)
-                    .exceptionally(exception -> {
-                        exceptionHandler.accept(exception);
-                        return null;
-                    });
-
-            try {
-                solveSimplex(simplex, upperBoundFunction, upperBiOrder, upperBiOrder[xIndex + xCount]);
-            } catch (IncompatibleSimplexSolveException e) {
-                exceptionHandler.accept(e);
-            }
-
-            future.join();
-        }
-
-        protected Function<Simplex, SimplexAnswer> getBoundFunction(Integer[] biOrder, int xIndex, double bound,
-                                                                  Inequality inequality, boolean[] isAdded) {
-            Integer order = biOrder[xIndex];
-            if (order != null) {
-                isAdded[0] = false;
-                return changeBFunction(order + oldConstraintsCount, bound);
-            } else {
-                isAdded[0] = true;
-                return addConstraintFunction(xIndex % xCount, inequality, bound);
-            }
-        }
-
-        protected Function<Simplex, SimplexAnswer> addConstraintFunction(int xIndex, Inequality inequality, double bi) {
-            double[] ai = createAi(xIndex);
-            return simplex -> simplex.addConstraint(ai, inequality, bi);
-        }
-
-        protected Function<Simplex, SimplexAnswer> changeBFunction(int index, double bi) {
-            return simplex -> simplex.changeB(index, bi);
-        }
-
-        protected double[] createAi(int xIndex) {
-            double[] ai = new double[xCount];
-            Arrays.fill(ai, 0);
-            ai[xIndex] = 1d;
-
-            return ai;
+        @Override
+        protected AnswersAccumulator<SimplexAnswer> answersAccumulator(Simplex simplex) {
+            return new SingleAnswerAccumulator(simplex.functionType());
         }
     }
 
-    private static class ExtendedSolver extends SimpleSolver {
-
-        private System.Logger logger = new NoOpsLogger();
+    private static class FindAllSolver extends SimpleSolver<List<SimplexAnswer>> {
 
         @Override
-        public Solver logger(System.Logger logger) {
-            this.logger = logger;
-            return this;
+        protected AnswersAccumulator<List<SimplexAnswer>> answersAccumulator(Simplex simplex) {
+            return new MultiAnswersAccumulator(simplex.functionType());
         }
 
         @Override
-        public void solveSimplex(Simplex.Builder simplexBuilder) {
-            Simplex simplex = simplexBuilder.build();
-            try {
-                simplex.solve();
-            } catch (Exception e) {
-                exceptionHandler.accept(e);
-                return;
+        public List<SimplexAnswer> solveSimplex(Simplex simplex) {
+            AnswersAccumulator<List<SimplexAnswer>> answersAccumulator = answersAccumulator(simplex);
+            Queue<SimplexWrapper> simplexes = new ArrayDeque<>();
+            simplexes.add(new SimpleWrapper(simplex));
+
+            while (!simplexes.isEmpty()) {
+                SimplexWrapper wrapper = simplexes.remove();
+
+                SimplexAnswer answer = null;
+                try {
+                    Simplex smp = wrapper.solve();
+                    answer = smp.solve();
+
+                    if (!wrapper.isAlternativeSolution()) {
+                        smp.findAlternativeSolutions()
+                                .stream()
+                                .map(wrapper::alternativeSolution)
+                                .forEach(simplexes::add);
+                    }
+                } catch (Exception e) {
+                    exceptionHandler.accept(e);
+                    continue;
+                }
+
+                if (isLegalAnswer(answer)) {
+                    answersAccumulator.tryPutAnswer(answer);
+                    continue;
+                }
+
+                if (!answersAccumulator.hasBetterThan(answer)) {
+                    List<SimplexWrapper> newSimplexes = createWithNewConstraints(wrapper);
+                    simplexes.addAll(newSimplexes);
+                }
             }
 
-            List<Simplex> alternativeSolutions = simplex.findAlternativeSolutions();
-            logger.log(System.Logger.Level.INFO, String.format("Alternative solutions' size is: %d%n", alternativeSolutions.size()));
+            return answersAccumulator.answer();
+        }
+    }
 
-            var tasks = alternativeSolutions.stream()
-                    .map(alternativeSolution -> (Runnable) () -> compareAndResolve(alternativeSolution, new Integer[xCount * 2], -1))
-                    .map(task -> CompletableFuture.runAsync(task, executor)
-                            .exceptionally(exception -> {
-                                exceptionHandler.accept(exception);
-                                return null;
-                            }))
-                    .toArray(CompletableFuture[]::new);
-            CompletableFuture<Void> future = CompletableFuture.allOf(tasks);
+    interface SimplexWrapper {
+        SimplexWrapper lowerBoundX(int index, double bi);
+        SimplexWrapper upperBoundX(int index, double bi);
+        Simplex solve();
+        Simplex simplex();
 
-            compareAndResolve(simplex, new Integer[xCount * 2], -1);
-            future.join();
+        SimplexWrapper alternativeSolution(Simplex simplex);
+        boolean isAlternativeSolution();
+
+        enum BoundType {
+            LOWER,
+            UPPER
+        }
+    }
+
+    private static class AlternativeWrapper implements SimplexWrapper {
+
+        private final SimplexWrapper wrapper;
+
+        private AlternativeWrapper(SimplexWrapper wrapper) {
+            this.wrapper = wrapper;
         }
 
-        private void compareAndResolve(Simplex simplex, Integer[] biOrder, int constraintCount) {
-            SimplexAnswer answer = simplex.solve();
-            double[] X = answer.X();
+        @Override
+        public SimplexWrapper lowerBoundX(int index, double bi) {
+            return wrapper.lowerBoundX(index, bi);
+        }
 
-            if (answersAccumulator.hasBetterThan(answer)) {
-                return;
+        @Override
+        public SimplexWrapper upperBoundX(int index, double bi) {
+            return wrapper.upperBoundX(index, bi);
+        }
+
+        @Override
+        public Simplex solve() {
+            return wrapper.solve();
+        }
+
+        @Override
+        public Simplex simplex() {
+            return wrapper.simplex();
+        }
+
+        @Override
+        public SimplexWrapper alternativeSolution(Simplex simplex) {
+            return new AlternativeWrapper(wrapper.alternativeSolution(simplex));
+        }
+
+        @Override
+        public boolean isAlternativeSolution() {
+            return true;
+        }
+    }
+
+    private static class SimpleWrapper implements SimplexWrapper {
+
+        private final Simplex simplex;
+
+        private SimpleWrapper(Simplex simplex) {
+            this.simplex = simplex.copy();
+        }
+
+        @Override
+        public SimplexWrapper lowerBoundX(int index, double bi) {
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.LOWER);
+        }
+
+        @Override
+        public SimplexWrapper upperBoundX(int index, double bi) {
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.UPPER);
+        }
+
+        @Override
+        public Simplex solve() {
+            simplex.solve();
+            return simplex;
+        }
+
+        @Override
+        public Simplex simplex() {
+            return simplex;
+        }
+
+        @Override
+        public SimplexWrapper alternativeSolution(Simplex simplex) {
+            return new AlternativeWrapper(new SimpleWrapper(simplex));
+        }
+
+        @Override
+        public boolean isAlternativeSolution() {
+            return false;
+        }
+    }
+
+    private static class AddConstraintWrapper implements SimplexWrapper {
+
+        private final Simplex simplex;
+        private final int xIndex;
+        private final double bi;
+
+        private final BoundType boundType;
+        private final Map<Integer, Integer> lowerBoundIndexes;
+        private final Map<Integer, Integer> upperBoundIndexes;
+
+        private AddConstraintWrapper(Simplex simplex, int xIndex, double bi, BoundType boundType) {
+            this(simplex, xIndex, bi, boundType, Map.of(), Map.of());
+        }
+
+        private AddConstraintWrapper(Simplex simplex, int xIndex, double bi, BoundType boundType,
+                                     Map<Integer, Integer> lowerBoundIndexes, Map<Integer, Integer> upperBoundIndexes) {
+            this.simplex = simplex.copy();
+            this.xIndex = xIndex;
+            this.bi = bi;
+            this.boundType = boundType;
+            this.lowerBoundIndexes = new HashMap<>(lowerBoundIndexes);
+            this.upperBoundIndexes = new HashMap<>(upperBoundIndexes);
+
+            if (boundType == BoundType.LOWER) {
+                this.lowerBoundIndexes.put(xIndex, simplex.bConstraintsCount());
+            } else {
+                this.upperBoundIndexes.put(xIndex, simplex.bConstraintsCount());
+            }
+        }
+
+        @Override
+        public SimplexWrapper lowerBoundX(int index, double bi) {
+            if (lowerBoundIndexes.containsKey(index)) {
+                return new ChangeBWrapper(simplex, index, bi, BoundType.LOWER, lowerBoundIndexes, upperBoundIndexes);
             }
 
-            Integer xIndex = getInvalidXIndex(X);
-            if (xIndex == null) {
-                setAnswer(answer);
-                return;
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.LOWER, lowerBoundIndexes, upperBoundIndexes);
+        }
+
+        @Override
+        public SimplexWrapper upperBoundX(int index, double bi) {
+            if (upperBoundIndexes.containsKey(index)) {
+                return new ChangeBWrapper(simplex, index, bi, BoundType.UPPER, lowerBoundIndexes, upperBoundIndexes);
             }
 
-            resolve(simplex, biOrder, constraintCount, X[xIndex], xIndex);
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.UPPER, lowerBoundIndexes, upperBoundIndexes);
+        }
+
+        @Override
+        public Simplex solve() {
+            double[] ai = new double[simplex.xCount()];
+            ai[xIndex] = 1;
+
+            Inequality inequality =
+                    boundType == BoundType.LOWER ?
+                            LQ : GE;
+            simplex.addConstraint(ai, inequality, bi);
+            return simplex;
+        }
+
+        @Override
+        public Simplex simplex() {
+            return simplex;
+        }
+
+        @Override
+        public SimplexWrapper alternativeSolution(Simplex simplex) {
+            return new AlternativeWrapper(new AddConstraintWrapper(simplex, xIndex, bi, boundType, lowerBoundIndexes, upperBoundIndexes));
+        }
+
+        @Override
+        public boolean isAlternativeSolution() {
+            return false;
+        }
+    }
+
+    private static class ChangeBWrapper implements SimplexWrapper {
+
+        private final Simplex simplex;
+        private final int bIndex;
+        private final double bi;
+
+        private final Map<Integer, Integer> lowerBoundIndexes;
+        private final Map<Integer, Integer> upperBoundIndexes;
+
+        private ChangeBWrapper(Simplex simplex, int xIndex, double bi, BoundType boundType,
+                               Map<Integer, Integer> lowerBoundIndexes, Map<Integer, Integer> upperBoundIndexes) {
+            this.simplex = simplex.copy();
+            this.bIndex = boundType == BoundType.LOWER ? lowerBoundIndexes.get(xIndex) : upperBoundIndexes.get(xIndex);
+            this.bi = bi;
+            this.lowerBoundIndexes = Map.copyOf(lowerBoundIndexes);
+            this.upperBoundIndexes = Map.copyOf(upperBoundIndexes);
+        }
+
+        private ChangeBWrapper(Simplex simplex, int bIndex, double bi,
+                               Map<Integer, Integer> lowerBoundIndexes, Map<Integer, Integer> upperBoundIndexes) {
+            this.simplex = simplex.copy();
+            this.bIndex = bIndex;
+            this.bi = bi;
+            this.lowerBoundIndexes = Map.copyOf(lowerBoundIndexes);
+            this.upperBoundIndexes = Map.copyOf(upperBoundIndexes);
+        }
+
+        @Override
+        public SimplexWrapper lowerBoundX(int index, double bi) {
+            if (lowerBoundIndexes.containsKey(index)) {
+                return new ChangeBWrapper(simplex, index, bi, BoundType.LOWER, lowerBoundIndexes, upperBoundIndexes);
+            }
+
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.LOWER, lowerBoundIndexes, upperBoundIndexes);
+        }
+
+        @Override
+        public SimplexWrapper upperBoundX(int index, double bi) {
+            if (upperBoundIndexes.containsKey(index)) {
+                return new ChangeBWrapper(simplex, index, bi, BoundType.UPPER, lowerBoundIndexes, upperBoundIndexes);
+            }
+
+            return new AddConstraintWrapper(simplex, index, bi, BoundType.UPPER, lowerBoundIndexes, upperBoundIndexes);
+        }
+
+        @Override
+        public Simplex solve() {
+            simplex.changeB(bIndex, bi);
+            return simplex;
+        }
+
+        @Override
+        public Simplex simplex() {
+            return simplex;
+        }
+
+        @Override
+        public SimplexWrapper alternativeSolution(Simplex simplex) {
+            return new AlternativeWrapper(new ChangeBWrapper(simplex, bIndex, bi, lowerBoundIndexes, upperBoundIndexes));
+        }
+
+        @Override
+        public boolean isAlternativeSolution() {
+            return false;
         }
     }
 
