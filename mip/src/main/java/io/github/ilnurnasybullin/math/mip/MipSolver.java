@@ -278,10 +278,13 @@ public class MipSolver {
                     answer = smp.solve();
 
                     if (!wrapper.isAlternativeSolution()) {
+                        logger.log(System.Logger.Level.INFO, "FINDING ALTERNATIVE SOLUTIONS...");
+                        int size = simplexes.size();
                         smp.findAlternativeSolutions()
                                 .stream()
                                 .map(wrapper::alternativeSolution)
                                 .forEach(simplexes::add);
+                        logger.log(System.Logger.Level.INFO, "ALTERNATIVE SOLUTIONS ARE FOUNDED, size is %d%n", simplexes.size() - size);
                     }
                 } catch (Exception e) {
                     exceptionHandler.accept(e);
