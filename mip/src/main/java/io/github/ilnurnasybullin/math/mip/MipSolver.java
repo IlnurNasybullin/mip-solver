@@ -158,6 +158,7 @@ public class MipSolver {
 
         @Override
         public SimpleSolver<T> logger(System.Logger logger) {
+            this.logger = logger;
             return this;
         }
 
