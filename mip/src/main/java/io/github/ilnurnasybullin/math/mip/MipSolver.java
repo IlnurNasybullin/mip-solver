@@ -113,6 +113,8 @@ public class MipSolver {
                 .answersAccumulator(answersAccumulator)
                 .solveSimplex(simplexBuilder);
 
+        logger.log(System.Logger.Level.INFO, "Mip is solved");
+
         return answersAccumulator.answer();
     }
 
