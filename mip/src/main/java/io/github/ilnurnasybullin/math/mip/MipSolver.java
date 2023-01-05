@@ -149,6 +149,7 @@ public class MipSolver {
 
     private Solver configSolver(Solver solver, Simplex.Builder builder, DoubleUnaryOperator[] lowerBoundFunctions,
                                 DoubleUnaryOperator[] upperBoundFunctions, DoublePredicate[] predicates) {
+        solver = solver.logger(logger);
         if (builder.getC() == null) {
             throw new SimplexDataException("C vector is null!");
         }
@@ -225,6 +226,7 @@ public class MipSolver {
     }
 
     interface Solver {
+        Solver logger(System.Logger logger);
         Solver answersAccumulator(AnswersAccumulator answersAccumulator);
         Solver correctValues(DoublePredicate[] correctValues);
         Solver lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions);
@@ -284,6 +286,11 @@ public class MipSolver {
         protected int oldConstraintsCount;
 
         protected AnswersAccumulator answersAccumulator;
+
+        @Override
+        public Solver logger(System.Logger logger) {
+            return this;
+        }
 
         @Override
         public SimpleSolver answersAccumulator(AnswersAccumulator answersAccumulator) {
@@ -458,7 +465,8 @@ public class MipSolver {
 
         private System.Logger logger = new NoOpsLogger();
 
-        public SimpleSolver logger(System.Logger logger) {
+        @Override
+        public Solver logger(System.Logger logger) {
             this.logger = logger;
             return this;
         }
