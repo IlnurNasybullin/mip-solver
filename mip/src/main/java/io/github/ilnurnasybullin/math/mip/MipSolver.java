@@ -482,7 +482,7 @@ public class MipSolver {
             }
 
             List<Simplex> alternativeSolutions = simplex.findAlternativeSolutions();
-            logger.log(System.Logger.Level.DEBUG, String.format("Alternative solutions' size is: %d%n", alternativeSolutions.size()));
+            logger.log(System.Logger.Level.INFO, String.format("Alternative solutions' size is: %d%n", alternativeSolutions.size()));
 
             var tasks = alternativeSolutions.stream()
                     .map(alternativeSolution -> (Runnable) () -> compareAndResolve(alternativeSolution, new Integer[xCount * 2], -1))
