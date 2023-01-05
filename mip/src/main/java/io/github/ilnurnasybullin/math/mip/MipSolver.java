@@ -41,11 +41,19 @@ public class MipSolver {
      * {@link Simplex.Builder} для решения задачи линейного программирования симплекс-методом, предикаты
      * ({@link Solver#correctValues}) и унарные операторы ({@link Solver#lowerBoundFunctions}, {@link Solver#upperBoundFunctions})
      * вычисляются по умолчанию, в качестве ответа возвращается {@link List<SimplexAnswer>}, содеражщий всевозможные
-     * оптимальные значения вектора X ({@link SimplexAnswer#getX()}) и значение функции ({@link SimplexAnswer#getFx()}).
+     * оптимальные значения вектора X ({@link SimplexAnswer#X()}) и значение функции ({@link SimplexAnswer#fx()}).
      * В процессе вычисления возможны все выбросы исключений при решении задачи симплекс-методом
      * ({@link io.github.ilnurnasybullin.math.simplex.exception}), которые, при решении во всех узлах (кроме корневого)
      * будут перехвачены обработчиком ошибок {@link #exceptionHandler}
      */
+
+    private System.Logger logger = new NoOpsLogger();
+
+    public MipSolver logger(System.Logger logger) {
+        this.logger = logger;
+        return this;
+    }
+
     public List<SimplexAnswer> findAll(Simplex.Builder simplexBuilder) {
         var answersAccumulator = new MultiAnswersAccumulator(functionType(simplexBuilder.getFunctionType()));
 
@@ -447,6 +455,14 @@ public class MipSolver {
     }
 
     private static class ExtendedSolver extends SimpleSolver {
+
+        private System.Logger logger = new NoOpsLogger();
+
+        public SimpleSolver logger(System.Logger logger) {
+            this.logger = logger;
+            return this;
+        }
+
         @Override
         public void solveSimplex(Simplex.Builder simplexBuilder) {
             Simplex simplex = simplexBuilder.build();
@@ -458,6 +474,7 @@ public class MipSolver {
             }
 
             List<Simplex> alternativeSolutions = simplex.findAlternativeSolutions();
+            logger.log(System.Logger.Level.DEBUG, String.format("Alternative solutions' size is: %d%n", alternativeSolutions.size()));
 
             var tasks = alternativeSolutions.stream()
                     .map(alternativeSolution -> (Runnable) () -> compareAndResolve(alternativeSolution, new Integer[xCount * 2], -1))
@@ -471,8 +488,6 @@ public class MipSolver {
 
             compareAndResolve(simplex, new Integer[xCount * 2], -1);
             future.join();
-
-            super.solveSimplex(simplexBuilder);
         }
 
         private void compareAndResolve(Simplex simplex, Integer[] biOrder, int constraintCount) {
