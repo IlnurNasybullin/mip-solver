@@ -293,8 +293,6 @@ public class MipSolverTest {
         List<SimplexAnswer> answers = simplex.findAll(builder.build());
 
         for (SimplexAnswer answer: answers) {
-            System.out.printf("ANSWER is %s%n", Arrays.toString(answer.X()));
-            System.out.printf("FX is %f%n", answer.fx());
             Assertions.assertArrayEquals(expectedX, answer.X(), Simplex.EPSILON);
             Assertions.assertEquals(expectedFx, answer.fx(), Simplex.EPSILON);
         }

@@ -3,14 +3,14 @@ package io.github.ilnurnasybullin.math.mip;
 import io.github.ilnurnasybullin.math.simplex.Inequality;
 import io.github.ilnurnasybullin.math.simplex.Simplex;
 import io.github.ilnurnasybullin.math.simplex.SimplexAnswer;
-import io.github.ilnurnasybullin.math.simplex.exception.SimplexDataException;
 
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.DoublePredicate;
 import java.util.function.DoubleUnaryOperator;
 
-import static io.github.ilnurnasybullin.math.simplex.Inequality.*;
+import static io.github.ilnurnasybullin.math.simplex.Inequality.GE;
+import static io.github.ilnurnasybullin.math.simplex.Inequality.LQ;
 
 /**
  * Класс, с помощью которого можно решать задачи дискретной оптимизации. Работает поверх класса {@link Simplex} с
@@ -27,11 +27,21 @@ public class MipSolver {
      */
     private Consumer<Throwable> exceptionHandler = exception -> System.err.println(exception.getMessage());
 
-    private System.Logger logger = new NoOpsLogger();
+    /**
+     * Finding all solutions for MIP.
+     * @implNote For finding all solutions is used {@link Simplex#findAlternativeSolutions()}, so <b>it can be real
+     * difficult complex computational task, recommended for using in separate thread!</b>
+     * In future versions calculations can be multithreading
+     */
+    public List<SimplexAnswer> findAll(Simplex simplex) {
+        int xCount = simplex.xCount();
 
-    public MipSolver logger(System.Logger logger) {
-        this.logger = logger;
-        return this;
+        return new FindAllSolver()
+                .exceptionHandler(exceptionHandler)
+                .upperBoundFunctions(defaultUpperBoundFunctions(xCount))
+                .lowerBoundFunctions(defaultLowerBoundFunctions(xCount))
+                .correctValues(defaultPredicates(xCount))
+                .solveSimplex(simplex);
     }
 
     /**
@@ -44,19 +54,6 @@ public class MipSolver {
      * ({@link io.github.ilnurnasybullin.math.simplex.exception}), которые, при решении во всех узлах (кроме корневого)
      * будут перехвачены обработчиком ошибок {@link #exceptionHandler}
      */
-
-    public List<SimplexAnswer> findAll(Simplex simplex) {
-        int xCount = simplex.xCount();
-
-        return new FindAllSolver()
-                .exceptionHandler(exceptionHandler)
-                .upperBoundFunctions(defaultUpperBoundFunctions(xCount))
-                .lowerBoundFunctions(defaultLowerBoundFunctions(xCount))
-                .correctValues(defaultPredicates(xCount))
-                .logger(logger)
-                .solveSimplex(simplex);
-    }
-
     public SimplexAnswer findAny(Simplex simplex) {
         int xCount = simplex.xCount();
 
@@ -65,7 +62,6 @@ public class MipSolver {
                 .upperBoundFunctions(defaultUpperBoundFunctions(xCount))
                 .lowerBoundFunctions(defaultLowerBoundFunctions(xCount))
                 .correctValues(defaultPredicates(xCount))
-                .logger(logger)
                 .solveSimplex(simplex);
     }
 
@@ -103,19 +99,12 @@ public class MipSolver {
         return operators;
     }
 
-    private <T> void validateArrayLength(int length, T[] array) {
-        if (array == null || array.length != length) {
-            throw new SimplexDataException(String.format("Invalid data: (%s) for this array!", Arrays.toString(array)));
-        }
-    }
-
     public MipSolver exceptionHandler(Consumer<Throwable> exceptionHandler) {
         this.exceptionHandler = exceptionHandler;
         return this;
     }
 
     interface Solver<T> {
-        Solver<T> logger(System.Logger logger);
         Solver<T> correctValues(DoublePredicate[] correctValues);
         Solver<T> lowerBoundFunctions(DoubleUnaryOperator[] lowerBoundFunctions);
         Solver<T> upperBoundFunctions(DoubleUnaryOperator[] upperBoundFunctions);
@@ -153,14 +142,6 @@ public class MipSolver {
         protected DoubleUnaryOperator[] upperBoundFunctions;
 
         protected Consumer<Throwable> exceptionHandler = exception -> System.err.println(exception.getMessage());
-
-        protected System.Logger logger = new NoOpsLogger();
-
-        @Override
-        public SimpleSolver<T> logger(System.Logger logger) {
-            this.logger = logger;
-            return this;
-        }
 
         @Override
         public SimpleSolver<T> correctValues(DoublePredicate[] correctValues) {
@@ -279,13 +260,10 @@ public class MipSolver {
                     answer = smp.solve();
 
                     if (!wrapper.isAlternativeSolution()) {
-                        logger.log(System.Logger.Level.INFO, "FINDING ALTERNATIVE SOLUTIONS...");
-                        int size = simplexes.size();
                         smp.findAlternativeSolutions()
                                 .stream()
                                 .map(wrapper::alternativeSolution)
                                 .forEach(simplexes::add);
-                        logger.log(System.Logger.Level.INFO, "ALTERNATIVE SOLUTIONS ARE FOUNDED, size is {0}", simplexes.size() - size);
                     }
                 } catch (Exception e) {
                     exceptionHandler.accept(e);

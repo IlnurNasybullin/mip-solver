@@ -25,12 +25,13 @@ public class MipSolverAlternativeSolutionsTest {
                 .map(SimplexAnswer::X)
                 .map(ArrayWrapper::new)
                 .distinct()
-                .peek(x -> System.out.printf("ANSWER IS: %s%n", x))
                 .map(ArrayWrapper::array)
-                .forEach(x -> Assertions.assertTrue(
-                        removeArrayEquals(x, expectedX, Simplex.EPSILON),
-                        errorMessage(x, expectedX)
-                ));
+                .forEach(x -> {
+                    Assertions.assertTrue(
+                            removeArrayEquals(x, expectedX, Simplex.EPSILON),
+                            errorMessage(x, expectedX)
+                    );
+                });
 
         Assertions.assertTrue(expectedX.isEmpty());
     }
