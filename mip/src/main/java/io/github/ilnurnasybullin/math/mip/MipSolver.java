@@ -67,8 +67,9 @@ public class MipSolver {
 
     public static DoublePredicate[] defaultPredicates(int xCount) {
         DoublePredicate predicate = value -> {
-            long longValue = (long) value;
-            return isApproximateValue(value, longValue);
+            double ceil = Math.ceil(value);
+            double floor = Math.floor(value);
+            return isApproximateValue(value, ceil) || isApproximateValue(value, floor);
         };
 
         DoublePredicate[] predicates = new DoublePredicate[xCount];
@@ -178,7 +179,7 @@ public class MipSolver {
             while (!simplexes.isEmpty()) {
                 SimplexWrapper wrapper = simplexes.remove();
 
-                SimplexAnswer answer = null;
+                SimplexAnswer answer;
                 try {
                     Simplex smp = wrapper.solve();
                     answer = smp.solve();
